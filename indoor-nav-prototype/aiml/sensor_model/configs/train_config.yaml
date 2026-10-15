@@ -1,0 +1,60 @@
+# train_config.yaml — Sensor Model Training Configuration
+# All values here are the source of truth for the training pipeline.
+# Firmware preprocessing (normalize.cpp, sensor_buffer.h) must match.
+
+model:
+  architecture: "1d_cnn"
+  input_shape: [20, 9]      # [window_size, channels] — must match SENSOR_WINDOW_SIZE * SENSOR_CHANNELS
+  num_classes: 9            # must match NUM_SENSOR_CLASSES in config.h
+  filters: [32, 64, 64]    # Conv1D filter counts per layer
+  kernel_size: 3
+  dropout: 0.3
+  dense_units: 64
+
+training:
+  epochs: 100
+  batch_size: 32
+  learning_rate: 0.001
+  lr_scheduler: "cosine_decay"
+  early_stopping_patience: 15
+  val_split: 0.2
+  class_weighted_loss: true   # important: class imbalance is expected (open_space >> dropoff)
+
+data:
+  window_size: 20            # number of timesteps per sample — matches firmware SENSOR_WINDOW_SIZE
+  step_size: 5               # hop between windows (overlap = window_size - step_size)
+  channels: 9                # must match SENSOR_CHANNELS
+  channel_names:
+    - front_cm
+    - left_cm
+    - right_cm
+    - floor_mm
+    - gyro_x
+    - gyro_y
+    - gyro_z
+    - accel_x
+    - accel_y
+
+classes:                     # must match class_definitions.yaml sensor_classes (same order/index)
+  - static_obstacle
+  - moving_object
+  - open_space
+  - dropoff_edge
+  - approaching
+  - receding
+  - crossing
+  - user_motion
+  - unknown
+
+export:
+  quantization: "int8"
+  representative_samples: 200
+  output_tflite: "../../firmware/esp32_sensor_node/src/inference/model.tflite"
+  output_c_array: "../../firmware/esp32_sensor_node/src/inference/model_data.h"
+  c_array_var_name: "g_model_data"
+
+paths:
+  raw_data:       "../../data/raw/sensor/"
+  processed_data: "../../data/processed/sensor/"
+  checkpoints:    "./checkpoints/"
+  logs:           "./logs/"

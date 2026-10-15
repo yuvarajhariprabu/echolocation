@@ -1,0 +1,31 @@
+# Gateway configuration
+# Referenced by: edge_gateway/main.py, tile_grid.py, map_stream.py
+
+grid:
+  width:              100        # tiles (100 × 100 grid, centred on origin)
+  height:             100
+  tile_size_cm:       20         # physical size of one tile (20cm = 8 inches)
+  dynamic_decay_rate: 0.3        # per-second decay of dynamic object confidence
+
+map_stream:
+  port:               8765       # WebSocket port (map viewer connects here)
+  update_interval_s:  0.2        # push grid to browser every 200ms (5 Hz)
+
+guidance:
+  confidence_threshold: 0.65    # below this → generic caution only
+  near_obstacle_cm:     40       # NEAR zone (strong haptic)
+  warn_obstacle_cm:     90       # WARN zone (light haptic)
+
+audio:
+  tts_rate:    180               # words per minute
+  tts_volume:  1.0
+
+haptic:
+  # BCM GPIO pins on Raspberry Pi (update for your wiring)
+  front_pin:   17
+  left_pin:    27
+  right_pin:   22
+  pwm_freq_hz: 100
+
+# Set to true when running on a laptop without GPIO hardware
+simulate_haptic: true

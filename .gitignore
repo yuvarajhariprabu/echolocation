@@ -1,0 +1,46 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C / C++ / Arduino / PlatformIO
+.pio/
+*.hex
+*.elf
+*.bin
+
+# Environments
+.venv/
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Logs and databases
+*.log
+*.sqlite3
+
+# Node modules
+node_modules/
+package-lock.json
+
+# OS generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# IDEs
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Bulky datasets / runtime data
+data/raw/
+data/processed/
+indoor-nav-prototype/data/raw/
+indoor-nav-prototype/data/processed/

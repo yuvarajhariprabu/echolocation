@@ -1,0 +1,7 @@
+data/raw/
+data/processed/
+*.pyc
+__pycache__/
+.pio/
+.venv/
+*.log

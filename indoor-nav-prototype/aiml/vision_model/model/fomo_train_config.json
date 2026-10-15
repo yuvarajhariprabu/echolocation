@@ -1,0 +1,51 @@
+{
+  "project": "indoor-nav-prototype",
+  "version": "1.0",
+  "impulse": {
+    "image_width":  96,
+    "image_height": 96,
+    "image_channels": "Grayscale",
+    "resize_mode": "Fit shortest axis"
+  },
+  "processing_blocks": [
+    {
+      "id": "image",
+      "type": "image",
+      "axes": ["Image"],
+      "config": {
+        "color_depth": "Grayscale",
+        "resize": true,
+        "width":  96,
+        "height": 96
+      }
+    }
+  ],
+  "learning_blocks": [
+    {
+      "id": "fomo",
+      "type": "FOMO",
+      "config": {
+        "model": "FOMO MobileNetV2 0.35",
+        "epochs": 60,
+        "learning_rate": 0.001,
+        "batch_size": 32,
+        "data_augmentation": true,
+        "minimum_confidence_rating": 0.65
+      }
+    }
+  ],
+  "labels": [
+    "person",
+    "chair",
+    "table",
+    "door",
+    "stairs",
+    "wall",
+    "unknown_object"
+  ],
+  "notes": [
+    "Label order MUST match class_definitions.yaml vision_classes index order.",
+    "Upload dataset to Edge Impulse, run training, then export Arduino library.",
+    "Download and unzip the .zip library, reference it in esp32_cam_node/platformio.ini lib_deps."
+  ]
+}

@@ -1,0 +1,99 @@
+# class_definitions.yaml
+# SINGLE SOURCE OF TRUTH for all class labels.
+# This file is referenced by:
+#   - aiml/sensor_model/   (training + evaluation)
+#   - aiml/vision_model/   (training + evaluation)
+#   - edge_gateway/fusion/ (fusion_engine.py)
+#   - firmware/esp32_sensor_node/src/config.h  (index must match order here)
+#   - firmware/esp32_cam_node/src/config.h
+# DO NOT hardcode class indices anywhere else.
+
+sensor_classes:
+  # 1D CNN output classes — ESP32-S3 sensor node
+  # Index order matters: firmware maps output[i] directly to this list.
+  - index: 0
+    name: "static_obstacle"
+    description: "Fixed object in path (wall, furniture, etc.)"
+    haptic: "strong_steady"
+    audio: "Obstacle ahead"
+  - index: 1
+    name: "moving_object"
+    description: "Object changing distance while user is stationary (IMU-confirmed)"
+    haptic: "rapid_pulse"
+    audio: "Moving object detected"
+  - index: 2
+    name: "open_space"
+    description: "No obstacle in sensing range"
+    haptic: "none"
+    audio: ""
+  - index: 3
+    name: "dropoff_edge"
+    description: "Floor drops away — stairs, ramp, step"
+    haptic: "triple_beep_pattern"
+    audio: "Drop-off ahead, stop"
+  - index: 4
+    name: "approaching"
+    description: "Object moving toward user (IMU-confirmed stationary user)"
+    haptic: "escalating_pulse"
+    audio: "Something approaching"
+  - index: 5
+    name: "receding"
+    description: "Object moving away from user"
+    haptic: "slow_fade"
+    audio: ""
+  - index: 6
+    name: "crossing"
+    description: "Object crossing path laterally"
+    haptic: "side_sweep"
+    audio: "Object crossing"
+  - index: 7
+    name: "user_motion"
+    description: "Distance change caused by user's own movement (IMU-detected)"
+    haptic: "none"
+    audio: ""
+  - index: 8
+    name: "unknown"
+    description: "Below confidence threshold — do not assert specific guidance"
+    haptic: "gentle_caution"
+    audio: "Caution"
+
+vision_classes:
+  # FOMO output classes — ESP32-CAM node
+  # Index order matters: matches Edge Impulse project class order.
+  - index: 0
+    name: "person"
+    description: "Human present in field of view"
+    priority: 1
+  - index: 1
+    name: "chair"
+    description: "Chair or seat obstacle"
+    priority: 3
+  - index: 2
+    name: "table"
+    description: "Table — low clearance hazard"
+    priority: 3
+  - index: 3
+    name: "door"
+    description: "Door or doorway — potential passage or blocked entry"
+    priority: 2
+  - index: 4
+    name: "stairs"
+    description: "Staircase — high priority"
+    priority: 1
+  - index: 5
+    name: "wall"
+    description: "Wall or large obstruction"
+    priority: 2
+  - index: 6
+    name: "unknown_object"
+    description: "Unrecognized object — fall back to sensor class only"
+    priority: 4
+
+fusion:
+  # Rules for the gateway fusion engine
+  confidence_threshold: 0.65      # below this → treat as 'unknown', issue generic caution
+  disagreement_fallback: "caution" # if sensor_class and vision_class conflict → 'caution'
+  fast_path_classes:               # these trigger IMMEDIATE haptic with no camera wait
+    - "dropoff_edge"
+    - "approaching"
+    - "static_obstacle"

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BlindNav — Live Navigation Map</title>
+  <meta name="description" content="Real-time 2D tile-grid map for echolocation-inspired blind navigation prototype." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Header -->
+  <header class="header">
+    <div class="header-brand">
+      <div class="brand-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="3" fill="#60efff"/>
+          <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" stroke="#60efff" stroke-width="1.5" stroke-dasharray="3 3" fill="none"/>
+          <path d="M12 6v2M12 16v2M6 12H8M16 12h2" stroke="#60efff" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <span class="brand-name">BlindNav</span>
+      <span class="brand-sub">Live Navigation Map</span>
+    </div>
+    <div class="header-status">
+      <div class="status-dot" id="ws-status-dot"></div>
+      <span class="status-text" id="ws-status-text">Connecting…</span>
+    </div>
+  </header>
+
+  <!-- Main layout -->
+  <main class="layout">
+    <!-- Canvas panel -->
+    <section class="canvas-panel">
+      <div class="canvas-wrap">
+        <canvas id="map-canvas" width="600" height="600" aria-label="Live navigation tile grid"></canvas>
+        <div class="canvas-overlay" id="no-signal">
+          <div class="no-signal-icon">📡</div>
+          <p>Waiting for gateway…</p>
+          <p class="no-signal-sub">Run: <code>python -m edge_gateway.main</code></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <!-- Stats -->
+      <div class="card" id="card-stats">
+        <h2 class="card-title">Live Stats</h2>
+        <div class="stat-row"><span class="stat-label">User position</span><span class="stat-value" id="stat-pos">—</span></div>
+        <div class="stat-row"><span class="stat-label">Heading</span><span class="stat-value" id="stat-heading">—</span></div>
+        <div class="stat-row"><span class="stat-label">Path length</span><span class="stat-value" id="stat-path">—</span></div>
+        <div class="stat-row"><span class="stat-label">Static tiles</span><span class="stat-value" id="stat-static">—</span></div>
+        <div class="stat-row"><span class="stat-label">Dynamic objects</span><span class="stat-value" id="stat-dynamic">—</span></div>
+      </div>
+
+      <!-- Legend -->
+      <div class="card" id="card-legend">
+        <h2 class="card-title">Legend</h2>
+        <div class="legend-item"><div class="legend-swatch" style="background:#1e293b;border:1px solid #334155"></div><span>Unknown / unexplored</span></div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#0f172a"></div><span>Free space</span></div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#ef4444"></div><span>Static obstacle</span></div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#f97316"></div><span>Dynamic object (human)</span></div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#60efff"></div><span>User position</span></div>
+        <div class="legend-item"><div class="legend-swatch" style="background:#a78bfa"></div><span>Planned path</span></div>
+      </div>
+
+      <!-- Goal setter -->
+      <div class="card" id="card-goal">
+        <h2 class="card-title">Set Goal</h2>
+        <p class="card-hint">Click on the map to set a navigation goal.</p>
+        <div class="stat-row"><span class="stat-label">Goal tile</span><span class="stat-value" id="stat-goal">Not set</span></div>
+        <button class="btn" id="btn-clear-goal">Clear Goal</button>
+      </div>
+
+      <!-- Event log -->
+      <div class="card card-log" id="card-log">
+        <h2 class="card-title">Event Log</h2>
+        <div class="log-scroll" id="event-log"></div>
+      </div>
+    </aside>
+  </main>
+
+  <script src="src/ws_client.js"></script>
+  <script src="src/grid_renderer.js"></script>
+  <script src="src/user_marker.js"></script>
+  <script src="src/dynamic_overlay.js"></script>
+  <script src="src/path_overlay.js"></script>
+  <script>
+    // ── App bootstrap ─────────────────────────────────────────────────────
+    const canvas  = document.getElementById("map-canvas");
+    const ctx     = canvas.getContext("2d");
+    const noSig   = document.getElementById("no-signal");
+
+    let gridState  = null;
+    let pathState  = [];
+    let goalTile   = null;
+
+    // WebSocket
+    const ws = new BlindNavWS("ws://localhost:8765", {
+      onGrid(data) {
+        gridState = data;
+        noSig.style.display = "none";
+        updateStats(data);
+        render();
+      },
+      onPath(data) {
+        pathState = data;
+        render();
+      },
+      onStatus(connected) {
+        const dot  = document.getElementById("ws-status-dot");
+        const text = document.getElementById("ws-status-text");
+        dot.className  = "status-dot " + (connected ? "connected" : "disconnected");
+        text.textContent = connected ? "Gateway connected" : "Disconnected — retrying…";
+        if (!connected) noSig.style.display = "flex";
+      },
+    });
+
+    // Render loop
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      if (!gridState) return;
+      GridRenderer.draw(ctx, canvas, gridState);
+      DynamicOverlay.draw(ctx, canvas, gridState);
+      PathOverlay.draw(ctx, canvas, gridState, pathState);
+      UserMarker.draw(ctx, canvas, gridState);
+    }
+
+    // Stats update
+    function updateStats(data) {
+      const u = data.user;
+      document.getElementById("stat-pos").textContent     = `(${u.tx}, ${u.ty})`;
+      document.getElementById("stat-heading").textContent = `${u.heading_deg.toFixed(1)}°`;
+      document.getElementById("stat-path").textContent    = pathState.length ? `${pathState.length} tiles` : "—";
+
+      // Count static occupied tiles
+      let staticCount = 0, dynCount = 0;
+      for (let row of data.static)  for (let v of row) if (v === 1) staticCount++;
+      for (let row of data.dynamic) for (let v of row) if (v > 0.1) dynCount++;
+      document.getElementById("stat-static").textContent  = staticCount;
+      document.getElementById("stat-dynamic").textContent = dynCount;
+    }
+
+    // Click on canvas → set goal
+    canvas.addEventListener("click", (e) => {
+      if (!gridState) return;
+      const rect     = canvas.getBoundingClientRect();
+      const scaleX   = canvas.width  / rect.width;
+      const scaleY   = canvas.height / rect.height;
+      const cx       = (e.clientX - rect.left)  * scaleX;
+      const cy       = (e.clientY - rect.top)   * scaleY;
+      const tileSize = canvas.width / gridState.width;
+      const tx = Math.floor(cx / tileSize);
+      const ty = Math.floor(cy / tileSize);
+      goalTile = { tx, ty };
+      document.getElementById("stat-goal").textContent = `(${tx}, ${ty})`;
+      ws.sendGoal(tx, ty);
+      addLog(`Goal set → tile (${tx}, ${ty})`);
+    });
+
+    document.getElementById("btn-clear-goal").addEventListener("click", () => {
+      goalTile = null;
+      document.getElementById("stat-goal").textContent = "Not set";
+      pathState = [];
+      render();
+    });
+
+    function addLog(msg) {
+      const log = document.getElementById("event-log");
+      const item = document.createElement("div");
+      item.className = "log-item";
+      item.textContent = `${new Date().toLocaleTimeString()} — ${msg}`;
+      log.prepend(item);
+      while (log.children.length > 50) log.removeChild(log.lastChild);
+    }
+
+    // Animate even when no data (grid stays rendered)
+    function loop() { render(); requestAnimationFrame(loop); }
+    loop();
+  </script>
+</body>
+</html>
